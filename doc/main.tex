@@ -1,0 +1,386 @@
+
+\documentclass{article}
+
+\usepackage{polski}
+\usepackage[utf8]{inputenc}
+
+\usepackage[usenames,dvipsnames]{color} % Required for custom colors
+\usepackage{graphicx} % Required to insert images
+\usepackage{listings} % Required for insertion of code
+\usepackage{courier} % Required for the courier font
+\usepackage{lipsum} 
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{pdfpages}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{bbm}
+\usepackage{multirow}
+\usepackage{todonotes}
+\usepackage{algorithm2e}
+
+
+%% Sets page size and margins
+\usepackage[a4paper,top=3cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
+\setlength{\parindent}{0pt}
+%% Useful packages
+
+\title{Numeryczne wyznaczanie macierzy odwrotnej}
+\author{Grzegorz Ciesielski}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+
+Problem rozwiązania układu równań liniowych jest znany matematykom od wieków. Jednym z najwcześniejszych dokumentów poświęconych m. in. temu problemowi jest chiński traktat "The Nine Chapters on the Mathematical Art"\footnote{Do przeczytania: \url{http://ctext.org/nine-chapters}} z X-II w. p. n. e. Jest to prawdopodobnie pierwszy udokumentowany przypadek wykorzystania macierzy oraz wyznacznika do rozwiązywania układów równań liniowych. 
+
+Wyznaczenie macierzy odwrotnej jest problemem trudniejszym niż rozwiązanie układu równań liniowych, jednak ściśle z nim powiązanym. Znalezienie macierzy odwrotnej rozwiązuje układ równań liniowych i umożliwia proste wyznaczanie kolejnych jego rozwiązań, a rozwiązanie pewnej liczby konkretnych układów równań liniowych prowadzi do wyznaczenia macierzy odwrotnej.
+
+W poniższej pracy zajmiemy się problemem numerycznego wyznaczania macierzy odwrotnej z wysoką precyzją.
+
+\end{abstract}
+
+\section{Wprowadzenie}
+W poniższej pracy będziemy przyjmować następujące oznaczenia:
+\begin{enumerate}
+\item $A$ oznacza odwracalną macierz wymiaru $n\times n$,
+\item $x$ jest wektorem długości $n$,
+\item $A_i$ jest $i$-tym wierszem macierzy A,
+\item zapis $(a_1, a_2, \dots a_n)$, gdzie $a_i$ są wektorami, oznacza macierz, której kolumny są wektorami $a_1, a_2, \dots a_n$ odpowiednio,
+\item zapis $(A_1, \dots A_k, a_1, \dots a_n)$, gdzie $A_i$ są macierzami a $a_i$ wektorami oznacza macierz powstałą ze sklejenia macierzy $A_1, \dots A_k$ i wektorów $a_1, \dots a_n$ wzdłuż wierszy w podanej kolejności.
+\end{enumerate}
+
+\section{Przegląd metod}
+
+Do problemu znajdywania odwrotności macierzy można podejść na dwa sposoby: \textbf{pośrednio} i \textbf{bezpośrednio}.
+
+Metody pośrednie polegają na sprowadzeniu problemu odwracania macierzy do prostszego problemu, czyli wyznaczenia rozwiązania pojedynczego układu równań liniowych $Ax = b$. Metody bezpośrednie nie korzystają z tego faktu.
+
+\subsection{Metody bezpośrednie wyznaczania odwrotności macierzy}
+
+Metody bezpośrednie są wygodnymi metodami obliczania macierzy odwrotnej - często można macierz odwrotną zapisać w postaci pewnej liczby wzorów, jednak często nie są numerycznie poprawne lub mają dużą złożoność. W poniższej pracy przedstawimy 2 takie metody ze względu na fakt, iż czasem przydają się do wyznaczania bazy dla rozwiązań iteracyjnych - patrz rozdział \ref{sec:metodyiteracyjne}.
+
+\subsubsection{Metoda dopełnień algebraicznych \label{sec:dopelnienia}}
+
+Metoda dopełnień algebraicznych jest bezpośrednią  metodą wyznaczania macierzy odwrotnej.
+
+\paragraph{Definicja:} $A_{ij} = (-1)^{i+j} \cdot ($ wyznacznik  macierzy powstałej przez usunięcie $i$-tego wiersza i $j$-tej kolumny z macierzy $A$ $)$.
+
+\paragraph{Twierdzenie:} $A \cdot A_{ij}^T = I \cdot \det A$
+
+\paragraph{Dowód:} Poniższy dowód wykorzystuje fakt, że $\det A = \sum_{i=1}^{n}(-1)^{i+j}a_{ij}A_{ij} = \sum_{j=1}^{n}(-1)^{i+j}a_{ij}A_{ij}$ (rozwinięcie Laplace'a - patrz \cite{hohn2013elementary}, rozdział 7). \\
+Zamieńmy $i$-ty wiersz macierzy $A$ $k$-tym wierszem. Wówczas z rozwinięcia Laplace'a (i faktu, że powstała macierz jest macierzą osobliwą, gdy $j \ne i$) otrzymamy:
+\begin{equation} \label{eq:laplace}
+\begin{cases}
+\sum_{j=1}^{n}a_{kj}A_{ij} = 0 & \text{gdy } k \ne i \\
+\sum_{j=1}^{n}a_{kj}A_{ij} = \det(A) & \text{gdy } k = i
+\end{cases}
+\end{equation}
+oraz podobną tożsamość dla kolumn. Podmieniając zmienne otrzymujemy:
+\begin{equation}
+A  \cdot A_{ij}^T = \left[\sum_{k=1}^{n}a_{ik}A_{jk}\right]_{ij} \stackrel{(\ref{eq:laplace})}{=} \det A \cdot I
+\end{equation}
+Co kończy dowód. Zatem jeśli $\det A \ne 0$, to $\frac{1}{\det A}A_{ij}^{T} = A^{-1}$.
+
+\subsubsection{Metoda rekurencyjna Strassena \label{sec:strassen}}
+
+Metoda rekurencyjna Strassena jest metodą obliczania macierzy odwrotnej rekurencyjnie, zaproponowana przez Volkera Strassena bazującą na jego algorytmie szybkiego mnożenia macierzy.
+
+Zauważmy, że:
+\begin{equation}
+\begin{bmatrix}
+A_{11} & A_{12} \\
+A_{21} & A_{22} \\
+\end{bmatrix}
+= 
+\begin{bmatrix}
+I & 0 \\
+A_{21} & A_{11}^{-1} \\ 
+\end{bmatrix}
+\begin{bmatrix}
+A_{11} & 0 \\
+0 & \Delta \\
+\end{bmatrix}
+\begin{bmatrix}
+I & A_{11}^{-1} \\
+0 & I \\
+\end{bmatrix}
+\end{equation}
+gdzie $\Delta = A_{22} - A_{21}A_{11}^{-1}A_{12}$, oraz:
+\begin{equation}
+\begin{split}
+A^{-1}&=
+\begin{bmatrix}
+I &  -A_{11}^{-1}A_{12} \\
+0 & I \\
+\end{bmatrix}
+\begin{bmatrix}
+A_{11}^{-1} & 0 \\
+0 & \Delta^{-1} \\
+\end{bmatrix}
+\begin{bmatrix}
+I & 0 \\
+-A_{21}A_{11}^{-1} & I
+\end{bmatrix} \\
+&=
+\begin{bmatrix}
+A_{11}^{-1} + A_{11}^{-1}A_{12}\Delta^{-1}A_{21}A_{11}^{-1} & -A_{11}^{-1}A_{12}\Delta^{-1} \\
+-\Delta^{-1}A_{21}A_{11}^{-1} & \Delta^{-1} \\
+\end{bmatrix}
+\end{split}
+\end{equation}
+Zatem możemy wyznaczyć odwrotność macierzy wyznaczając odwrotność mniejszych macierzy: $A_{11}$ oraz $\Delta$. Warto zwrócić uwagę na fakt, że może się zdarzyć, iż macierz $A$ nie będzie osobliwa, ale macierz $A_{11}$ lub $\Delta$ już będzie (np. $I^T$). Wówczas algorytm nie zadziała poprawnie. Więcej informacji dotyczących tej metody (m. in. jak częściowo naprawić wspomniany błąd oraz analizę złożoności) można znaleźć w artykule \textit{"Triangular Factorization and Inversion by Fast Matrix Multiplication"} \cite{10.2307/2005828}.
+
+\subsection{Metody pośrednie \label{sec:metodyposrednie}}
+
+Jeśli znajdziemy sposób na rozwiązywanie układów równań liniowych, to wyznaczenie macierzy odwrotnej staje się wyjątkowo proste: wystarczy rozwiązać $n$ układów równań (gdzie $n$ jest wymiarem odwracanej macierzy macierzy):
+\begin{equation}\label{eq:main}
+Ax=E_1, \quad Ax=E_2, \quad \dots \quad Ax=E_n
+\end{equation}
+gdzie $E_1, \dots E_n$ są wektorami jednostkowymi. Wówczas jeśli $x_1, \dots x_n$ są rozwiązaniami powyższych równań, to $A^{-1} = (x_1, x_2, \dots x_n)$.
+\paragraph{Dowód:}
+\begin{equation}
+A\cdot(x_1, x_2, \dots x_n) = (Ax_1, Ax_2, \dots Ax_n) = (E_1, E_2, \dots E_n) = I
+\end{equation}
+
+\subsubsection{\label{sec:gauss} Metoda eliminacji Gaussa}
+
+Metoda eliminacji Gaussa jest metodą rozwiązywania układu równań liniowych postaci $Ax = b$. Polega ona na wykonywaniu określonych operacji na macierzy $A$ i wektorze $b$ tak, by nie zmienić rozwiązania układu równań, a macierz $A$ przekształcić do prostszej postaci. Zauważmy zatem, że wykonanie następujących operacji na macierzy $(A, b)$:
+\begin{enumerate}
+\item zamiana dowolnych dwóch wierszy miejscami,
+\item pomnożenie dowolnych wierszy przez niezerowy skalar,
+\item dodanie do jednego wiersza skalarnej krotności innego wiersza,
+\end{enumerate}
+nie zmienią rozwiązania układu $Ax = b$.
+Po wykonaniu dowolnej liczby powyższych operacji w dowolnej kombinacji otrzymujemy macierz $(A', b')$.
+
+Zauważmy również, że (o ile macierz $A$ jest nieosobliwa) korzystając z powyższych operacji możemy sprowadzić macierz $A$ do macierzy jednostkowej. Jak to dokładnie zrobić? Postępujemy zgodnie z algorytmem: \\
+
+\begin{algorithm}[H]
+\KwData{$A, b$}
+$M = (A, b)$ \;
+\For{$i \leftarrow 1$ \KwTo $n$}{
+	Posortuj wiersze macierzy $M$ malejąco względem modułu $i$-tej kolumny od $i$-tego miejsca\;
+    $M_i \leftarrow \frac{1}{m_{ii}} \cdot M_i$\;
+    \For{$j \leftarrow i + 1$ \KwTo $n$}{
+    	$M_j \leftarrow M_j - m_{ji} \cdot M_i$\;
+    } 
+}
+\For{$i \leftarrow n$ \KwTo $2$}{
+	\For{$j \leftarrow 1$ \KwTo $i-1$}{
+    	$M_j \leftarrow M_j - m_{ji} \cdot M_i$\;
+    }
+}
+\KwResult{$M^{n+1}$}
+\caption{Eliminacja Gaussa}
+\end{algorithm}
+
+Gdzie $M_i$ oznacza $i$-ty wiersz macierzy $M$, a $M^j$ oznacza $j$-tą kolumnę macierzy $M$.
+
+\paragraph{Poprawność algorytmu:} Po pierwsze zauważmy, że wykonujemy jedynie operacje takie, jak wyżej, zatem po wykonaniu algorytmu $M^{1..n} x = M^{n+1}$. Wystarczy zatem pokazać, że $M^{1..n} = I$.
+Rozważmy zatem pierwszą pętlę $for$ względem zmiennej $i$. \\
+
+\textbf{Teza:} Po $i$-tej iteracji tej pętli, $m_{kl}= 0$ dla $l \le i, \; l < k \le n$ oraz $m_{ii} = 1$. \\
+
+\textbf{Dowód tezy:} Druga część tezy jest oczywista - $i$-ty wiersz jest po posortowaniu (sortowanie macierzy zapobiega przypadkowi, gdy $m_{ii} = 0$, ponieważ nie może się zdarzyć tak, że wszystkie elementy w kolumnie będą zerami - wówczas macierz byłaby osobliwa) macierzy dzielony przez $m_{ii}$, zatem $m_{ii} = 1$. Wystarczy pokazać, że $m_{ki} = 0$ dla $i < k \le n$. Łatwo zauważyć, że zagnieżdżona pętla $for$ (względem zmiennej $j$) zeruje $m_{ki}$ dla $k=i+1 \dots n$ (ponieważ $M_i$ jest wektorem zaczynającym się od $i-1$ zer i z jedynką na $i$-tym miejscu), co kończy dowód tezy. \\
+
+Stąd wniosek, że po wykonaniu się tej pętli, macierz $M^{1..n}$ jest w postaci górnotrójkątnej z jedynkami na głównej współrzędnej. \\
+
+Analogicznie pokazujemy, że druga pętla $for$ względem zmiennej $i$ zeruje elementy nad przekątną macierzy $M^{1..n}$, zatem w wyniku działania algorytmu macierz $M^{1..n}$ jest macierzą jednostkową, co chcieliśmy pokazać.
+
+
+\subsubsection{Wzory Cramera}
+Wzory Cramera służą rozwiązywaniu układów równań liniowych postaci $Ax = b$, gdzie $A = [a_{ij}]$, $x = [x_i]$, $b = [b_i]$.
+\paragraph{Twierdzenie (Cramer, 1750):} Jeżeli macierz $A$ jest macierzą nieosobliwą, to układ $Ax=b$ ma dokładnie jedno rozwiązanie dane wzorem:
+\begin{equation}
+x_i = \frac{\det (a_1, \dots a_{i-1}, b, a_{i+1}, \dots a_n)}{\det(a_1, a_2, \dots a_n)}
+\end{equation}
+Gdzie $a_i$ jest $i$-tą kolumną macierzy $A$.
+\paragraph{Dowód:} Jeżeli macierz $A$ jest nieosobliwa, to dla dowolnego wektora $b$ istnieje wektor $x$ spełniający układ równań. Wówczas $a_1x_1 + a_2x_2 + \cdots + a_nx_n = b$, a z liniowości wyznacznika względem każdej współrzędnej mamy:
+\begin{equation}
+\begin{split}
+\det (a_1, \dots a_{i-1}, b, a_{i+1}, \dots a_n) &= (a_1, \dots a_{i-1}, \sum_{k=1}^{n}a_kx_k, a_{i+1}, \dots a_n) \\
+&= \sum_{k=1}^{n}x_k\det (a_1, \dots a_{i-1}, a_k, a_{i+1}, \dots a_n) \\
+&= x_i \det(a_1, a_2, \dots a_n)
+\end{split}
+\end{equation}
+\subsection{Metody iteracyjne rozwiązywania układu równań liniowych \label{sec:metodyiteracyjne}}
+
+Poniższe metody są szczególnymi przypadkami metod rozwiązywania układu równań liniowych:
+\begin{equation}
+\label{eq:iter_main}
+Ax = b
+\end{equation}
+Metody te polegają na aproksymowaniu wektora $x$ w kolejnych iteracjach, począwszy od pewnego przybliżenia początkowego $x_0$.
+
+\subsubsection{Metoda Richardsona}
+
+Metodę iteracyjną Richardsona definiuje wzór:
+\begin{equation}
+\label{eq:richardson}
+x_{k+1} = (I - \tau A)x_k + \tau b
+\end{equation}
+
+Ma ona jednak sporo wad. Pierwszą z nich jest dobór współczynnika $\tau$ - należy go odpowiednio wybrać, gdyż źle dobrany współczynnik poskutkuje kiepską zbieżnością lub też rozbieżnością metody. Kolejną - zbieżność. Metoda jest rzadko zbieżna, i jej zbieżność nie zależy od doboru punktu startowego, tylko od dodatniej określoności macierzy $A$. Oznaczmy przez $e_k$ błąd w $i$-tej iteracji metody Richardsona, tzn. $e_k = |x - x_k|$. Wówczas:
+\begin{equation}
+e_{k+1} = e_k - \tau A e_k = (I - \tau A) e_k
+\end{equation}
+Zatem:
+\begin{equation}
+\norm{e_{k+1}} = \norm{(I - \tau A) e_k} \le \norm{I-\tau A}\norm{e_k}
+\end{equation}
+Stąd otrzymujemy zbieżność metody, o ile $\norm{I-\tau A} < 1$, co nie zawsze musi być spełnione, nawet mimo dowolności $\tau$ (i faktu, że macierz $A$ jest nieosobliwa). Ponieważ chcemy, by nasza metoda działała dla każdej macierzy o niezerowym wyznaczniku, niezbędne będą pewne usprawnienia. \\
+
+Dowodzi się, że metoda Richardsona jest (nawet dość szybko) zbieżna dla macierzy symetrycznych. Dlaczego by więc, zamiast szukać rozwiązania układu $Ax = b$, nie rozwiązać za pomocą metody Richardsona równoważnego układu równań $A^TAx = A^TB$? Wówczas macierz $A^TA$ jest symetryczna, a metoda szybko zbiega. Jednak pojawia się pewien problem. Otóż $cond_2(A^TA) = cond_2(A)^2$, zatem w przypadku macierzy o umiarkowanie słabym uwarunkowaniu będziemy otrzymywać dość spore błędy, czego chcemy uniknąć.
+
+\subsubsection{Szeregi Neumanna}
+Szeregi Neumanna są szeregami przedstawiającymi odwrotności pewnych macierzy za pomocą macierzowych szeregów potęgowych. Jak się zaraz okaże, można je wykorzystać do poprawiania dokładności odwrotności macierzy, o ile mamy dostępne odpowiednie jej przybliżenie.
+
+\paragraph{Twierdzenie (Neumann):} Jeśli $A$ jest macierzą wymiaru $n\times n$ taką, że $\norm{A} < 1$, to macierz $I - A$ jest nieosobliwa oraz: 
+\begin{equation}
+\label{th:neumann}
+(I - A)^{-1} = \sum_{k=0}^{\infty}A^k
+\end{equation}
+\paragraph{Dowód:} Prosty dowód faktu, że macierz $I - A$ jest nieosobliwa pozostawiamy czytelnikowi. Udowodnimy, że szereg sum częściowych: $\sum_{k=0}^{m}A^k$ jest zbieżny do $(I - A)^{-1}$ przy $m \rightarrow \infty$. \\
+
+Wystarczy sprawdzić, że:
+\begin{equation}
+\label{eq:proof:neumann}
+(I - A)\sum_{k=0}^{m}A^k \xrightarrow[m \rightarrow \infty]{} I
+\end{equation}
+Zauważmy, że:
+\begin{equation}
+(I - A)\sum_{k=0}^{m}A^k = \sum_{k=0}^{m}(A^k - A^{k-1}) = A^0 - A^{k+1} = I - A^{k+1}
+\end{equation}
+A skoro $\norm{A^{m+1}} \le \norm{A}^{m+1} \xrightarrow[m \rightarrow \infty]{} 0$, więc zachodzi (\ref{eq:proof:neumann}).
+
+Twierdzenie to jest przykładem zastosowania potęgowych szeregów macierzy do wyznaczania odwrotności macierzy $I - A$. Jednak my skupimy się w poniższej pracy na prostym wniosku z powyższego twierdzenia:
+
+\paragraph{Wniosek:} Jeżeli $A, B$ są macierzami wymiaru $n \times n$ oraz $\norm{I -AB} < 1$, to są one nieosobliwe oraz:
+\begin{equation}
+\label{eq:conclusion:neumann}
+A^{-1} = B\sum_{k=0}^{\infty}(I - AB)^k, \quad B^{-1}=\sum_{k=0}^{\infty} (I - AB)^k A.
+\end{equation}
+
+\paragraph{Dowód:} Z poprzedniego twierdzenia macierz $AB$ jest nieosobliwa oraz 
+\begin{equation}
+B^{-1}A^{-1} = (AB)^{-1} = \sum_{k=0}^{\infty}(I - AB)^k
+\end{equation}
+Wymnażając powyższą równość obustronnie przez $A$ z prawej lub $B$ z lewej, otrzymujemy (\ref{eq:conclusion:neumann}). \\
+
+\section{Podejście do problemu}
+
+Nasze rozwiązanie opiera się na metodzie eliminacji Gaussa (rozdział \ref{sec:gauss}), ze względu na dobrą złożoność tej metody, dokładność oraz (praktyczną) poprawność numeryczną. W rozwiązaniu wykorzystujemy również wniosek z twierdzenia Neumanna w celu poprawienia dokładności wyniku.
+
+\subsection{Opis metody}
+
+Metoda eliminacji Gaussa służy do rozwiązywania układu równań liniowych $Ax = B$, a jak pokazaliśmy na początku rozdziału \ref{sec:metodyposrednie} każdą z takich metod można rozszerzyć do znajdywania odwrotności macierzy. W przypadku metody Gaussa rozwiązywanie w ten sposób wielu układów równań: $Ax_1 = b_1, Ax_2 = b_2, \dots Ax_k=b_k$ naraz jest wyjątkowo proste w implementacji - Wystarczy zastąpić macierz $(A, b)$ macierzą $(A, b_1, b_2, \dots b_k)$. Wówczas rozwiązania wymienionych układów po wykonaniu algorytmu będą ostatnimi $k$ kolumnami wynikowej macierzy, podobnie jak w zwykłym algorytmie. Zatem aby znaleźć odwrotność macierzy, w metodzie Gaussa należy przyjąć za macierz $M$ macierz $(A, I)$, która w wyniku iteracji algorytmu przejdzie na $(I, A^{-1})$ (patrz: paragraf \textbf{Poprawność algorytmu}). \\
+
+\subsubsection{Poprawność numeryczna algorytmu eliminacji Gaussa}
+
+\paragraph{Twierdzenie (Wilkinson):} Jeżeli w wyniku działania algorytmu eliminacji Gaussa dla równania $Ax = b$ otrzymamy zaburzone rozwiązanie $\widehat{A}\hat{x}=b$, to:
+\begin{equation}
+\frac{\norm{A - \widehat{A}}_{\infty}}{\norm{A}_{\infty}} \leq K n^3 \rho_n \nu,
+\end{equation}
+gdzie $\nu$ jest precyzją arytmetyki, $K$ niewielką stałą, a $\rho_n$ współczynnikiem wzrostu zdefiniowanym następująco:
+\begin{equation}
+\rho_n = \frac{\max\limits_{i, j, k} |a^{(k)}_{i, j}|}{\max\limits_{i, j}|a_{i, j}|}
+\end{equation}
+
+Dowód pominiemy - można go znaleźć w książce \textit{"Accuracy and Stability of Numerical Algorithms"} (\cite{higham2002accuracy}). Aby zatem udowodnić poprawność numeryczną, musimy ograniczyć współczynnik $\rho_n$. Okazuje się, że zachodzi ogólne ograniczenie $\rho_n < 2^{n-1}$ (znalezienie przykładowej takiej macierzy pozostawiamy czytelnikowi), a w większości przypadków $\rho_n < n^{\frac{2}{3}}$ (patrz: \cite{higham2002accuracy}). Zatem algorytm eliminacji Gaussa jest niemalże poprawny numerycznie - dla dużych $n$ i źle uwarunkowanych macierzy wyniki mogą być kiepskie w arytmetyce zbyt niskiej precyzji, ale na to trudno poradzić.
+
+\subsubsection{Skalowany wybór elementów głównych}
+
+Zastosujmy eliminację Gaussa do znalezienia odwrotności macierzy:
+\begin{equation}
+A =
+\begin{bmatrix}
+\epsilon & 1 \\ 1 & 1
+\end{bmatrix}
+\end{equation}
+W wyniku działania metody macierz $(A, I)$ przechodzi na macierze:
+\begin{equation}
+\begin{bmatrix}
+\epsilon & 1  & 1 & 0 \\ 1 & 1 & 0 & 1
+\end{bmatrix}
+\rightarrow
+\begin{bmatrix}
+1 & \epsilon^{-1} & \epsilon^{-1} & 0 \\ 0 & 1 - \epsilon^{-1} & -\epsilon^{-1} & 1
+\end{bmatrix}
+\rightarrow
+\begin{bmatrix}
+1 & \epsilon^{-1} & \epsilon^{-1} & 0 \\ 0 & 1 & \frac{\epsilon^{-1}}{\epsilon^{-1} - 1} & \frac{1}{1 - \epsilon^{-1}}
+\end{bmatrix}
+\end{equation}
+Jeżeli $\epsilon$ będzie dostatecznie mały, to $fl \left( \frac{\epsilon^{-1}}{\epsilon^{-1} - 1} \right) = 1$, zatem macierz przejdzie dalej na:
+\begin{equation}
+\cdots \rightarrow
+\begin{bmatrix}
+1 & 0 & 0 & \frac{\epsilon^{-1}}{\epsilon^{-1} - 1} \\ 0 & 1 & 1 & \frac{1}{1 - \epsilon^{-1}}
+\end{bmatrix}
+\end{equation}
+Czyli algorytm w wyniku zwróci macierz
+\begin{equation}
+\begin{bmatrix}
+0 & 1 \\ 1 & \frac{1}{1 - \epsilon^{-1}}
+\end{bmatrix}
+\ne A^{-1} = 
+\begin{bmatrix}
+\frac{1}{\epsilon - 1} & \frac{-1}{\epsilon - 1} \\
+\frac{-1}{\epsilon - 1} & \frac{1}{1 -  \epsilon^{-1}}
+\end{bmatrix} \approx 
+\begin{bmatrix}
+-1 & 1 \\ 1 & 0
+\end{bmatrix}
+\end{equation}
+Problem wynikanie z samego faktu, że $\epsilon$ jest mały, ale z tego, że jest on mały \textbf{względem} pierwszej kolumny. Jak więc ten problem naprawić? Zauważmy, że gdyby wpierw zamienić wiersze miejscami, problem by nie występował. Zatem pewnym (i, jak się okaże, dobrym) pomysłem może być zaczynanie metody eliminacji od wierszy zaczynających się elementem największym w stosunku do pozostałych elementów w swoim wierszu. 
+
+\subsubsection{Poprawianie wyniku}
+
+Wynik zwracany przez algorytm eliminacji Gaussa może być nieco zaburzony, jednak o ile macierz $A$ nie jest źle uwarunkowana, to zwracana macierz $B$ spełnia warunek $\norm{AB - I} < 1$ (testy wykazują, że w arytmetyce podwójnej precyzji dla macierzy o wskaźniku uwarunkowania $< 10^{11}$ warunek ten jest spełniony). W związku z tym, możemy zastosować wniosek (\ref{eq:conclusion:neumann}) z twierdzenia Neumanna, by poprawić dokładność rozwiązania wykorzystując elementarne działania na macierzach. Testy wykazały, że przybliżenie:
+\begin{equation}
+A^{-1} \approx B\sum_{k=0}^{1}(I - AB)^k = 2B-BAB
+\end{equation}
+jest w większości przypadków bliższe $A^{-1}$ niż $B$. Aby zwiększyć skuteczność tej metody, dobrze jest obliczać to przybliżenie w arytmetyce większej precyzji, by nie utracić precyzji podczas odejmowania $2B - BAB$.
+
+\subsection{Testy}
+
+Zasadnicze testy przeprowadziliśmy na macierzach wymiarów od $2\times 2$ do $500\times 500$ włącznie, o elementach będących losowymi liczbami rzeczywistymi z przedziału $[-1, 1)$ z rozkładem jednostajnym. Większość obliczeń wykonywaliśmy w arytmetyce zmiennoprzecinkowej podwojonej precyzji ($Float64$) - za wyjątkiem poprawiania wyniku szeregiem Neumanna, gdzie jednorazowo zwiększaliśmy precyzję. \\
+
+Za sposób pomiaru dokładności obliczonej odwrotności macierzy $A$ przyjmujemy normę macierz $AB - I$, gdzie $B$ jest macierzą zwróconą przez algorytm.
+
+Testowaliśmy 4 metody - metodę $inv$ z biblioteki języka Julia, naiwną metodę eliminacji Gaussa (GE), metodę Gaussa ze skalowanym wyborem elementów głównych (GE+S) oraz metodę Gaussa ze skalowaniem i poprawianiem wyniku szeregiem Neumanna (GE+SN).
+
+\begin{table}[h]
+\begin{tabular}{c|p{1.5cm}|p{2.5cm}|c|c|c|c|c|c}
+ &\multirow{2}{1.5cm}{rozmiary macierzy} & \multirow{2}{2.5cm}{średni czas obliczeń (ms)} & \multicolumn{2}{c}{średni błąd} & \multicolumn{2}{c}{maksymalny błąd} \\ algorytm &  &  &  $\norm{\cdot}_2$ &  $\norm{\cdot}_{\infty}$ & $\norm{\cdot}_2$ &  $\norm{\cdot}_{\infty}$ \\ \hline
+$inv$ & \multirow{4}{*}{2 - 10} & 1.096 & 3.3003e-18 & 5.1819e-18 & 9.0987e-17 & 1.5646e-16 \\
+GE & & 0.644 &  4.9205e-17 & 8.4921e-17 &  1.9496e-15 & 3.3219e-15 \\
+GE+S && 0.682 & 3.0657e-18 & 4.5612e-18 &  8.3143e-17 & 1.3089e-16 \\
+GE+SN && 3.873 & 1.4610e-18 & 2.4476e-18 & 4.2996e-17 & 8.0713e-17 \\ \hline
+$inv$ & \multirow{4}{*}{12 - 40} & 12.268 & 3.6982e-17 & 7.5121e-17 &  4.0667e-16 & 7.9410e-16 \\
+GE && 14.986 & 2.5088e-15 & 4.5129e-15 & 3.3555e-14 & 5.6023e-14 \\
+GE+S && 19.600 & 3.7326e-17 & 7.2352e-17 & 4.4568e-16 & 8.0256e-16 \\
+GE+SN && 114.275 & 7.0999e-18 & 1.7567e-17 & 7.9766e-17 & 1.9303e-16 \\ \hline
+$inv$ & \multirow{4}{*}{50 - 100} & 270.467 & 8.4363e-16 & 2.4783e-15 & 3.9652e-15 & 1.1755e-14 \\
+GE && 353.700 & 1.1750e-13 & 2.3986e-13 & 5.6964e-13 & 1.1506e-12 \\
+GE+S && 382.167 & 8.6812e-16 & 2.1135e-15 & 4.1039e-15 & 9.9631e-15 \\
+GE+SN && 1600.43 & 9.3680e-17 & 4.3422e-16 & 4.4304e-16 & 2.0630e-15 \\
+\hline
+\end{tabular}
+\caption{Porównanie algorytmów}
+\end{table}
+
+Powyższa tabela przedstawia osiągnięte wyniki. Naiwny algorytm Gaussa zdecydowanie nie spełnia wymagań - daje wyniki dużo gorsze od pozostałych metod. Eliminacja Gaussowska z wyborem elementów głównych daje wyniki bardzo zbliżone do funkcji bibliotecznej. Z kolei dodanie jeszcze poprawiania wyniku zdecydowanie polepsza wyniki, jednak kosztem czasu - algorytm musi przeprowadzić kilka kosztownych obliczeniowo mnożeń macierzy, co odbija się na szybkości działania.
+\bibliographystyle{alpha}
+\bibliography{sample}
+
+\end{document}
